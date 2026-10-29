@@ -267,6 +267,48 @@ task.spawn(function()
 	end
 end)
 
+-- レア専用サウンド: エピック以上でキラキラ音、レジェンダリー以上でファンファーレも重ねる
+local function makeSoundPool(prefix: string, count: number, soundId: string, volume: number): ({ Sound }, () -> ())
+	local pool = {}
+	for i = 1, count do
+		local sound = Instance.new("Sound")
+		sound.Name = prefix .. i
+		sound.SoundId = soundId
+		sound.Volume = volume
+		sound.Parent = SoundService
+		table.insert(pool, sound)
+	end
+	local index = 0
+	return pool, function()
+		index = (index % count) + 1
+		pool[index]:Play()
+	end
+end
+local rarePingPool, playRarePing = makeSoundPool("RarePing", 3, "rbxasset://sounds/electronicpingshort.wav", 0.5)
+rarePingPool[1].PlaybackSpeed = 1.3
+local fanfarePool, playFanfare = makeSoundPool("Fanfare", 2, "rbxasset://sounds/victory.wav", 0.45)
+task.spawn(function()
+	local ContentProvider = game:GetService("ContentProvider")
+	for _, pool in ipairs({ rarePingPool, fanfarePool }) do
+		pcall(function()
+			ContentProvider:PreloadAsync({ pool[1] })
+		end)
+		if not (pool[1].IsLoaded and pool[1].TimeLength > 0) then
+			for _, sound in ipairs(pool) do
+				sound.SoundId = ""
+			end
+		end
+	end
+end)
+local function rarityTierOf(rarityId: string): number
+	for i, rarity in ipairs(Config.Rarities) do
+		if rarity.Id == rarityId then
+			return i
+		end
+	end
+	return 1
+end
+
 local popupOrder = 0
 collectEffectRemote.OnClientEvent:Connect(function(reward: number, rarityId: string, isCrit: boolean, combo: number, mutationName: string, comboWindow: number)
 	displayCombo = combo
@@ -275,6 +317,13 @@ collectEffectRemote.OnClientEvent:Connect(function(reward: number, rarityId: str
 		serverComboWindow = comboWindow
 	end
 	playPop(combo, isCrit)
+	local tier = rarityTierOf(rarityId)
+	if tier >= 4 then
+		playRarePing()
+	end
+	if tier >= 5 then
+		playFanfare()
+	end
 	if reward >= 100 or isCrit then
 		coinsScale.Scale = 1.18
 		TweenService:Create(coinsScale, TweenInfo.new(0.25), { Scale = 1 }):Play()

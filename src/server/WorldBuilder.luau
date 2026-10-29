@@ -135,7 +135,7 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 	world.Name = "GameWorld"
 	world.Parent = workspace
 
-	local sea = makePart(world, "Sea", Vector3.new(1500, 1, 950), Vector3.new(150, -1.2, 0), Color3.fromRGB(35, 130, 215), Enum.Material.SmoothPlastic)
+	local sea = makePart(world, "Sea", Vector3.new(2500, 1, 950), Vector3.new(525, -1.2, 0), Color3.fromRGB(35, 130, 215), Enum.Material.SmoothPlastic)
 	sea.Transparency = 0.12
 	sea.CanCollide = false
 
@@ -261,6 +261,29 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 				makeCrystal(zoneFolder, zone.Center + Vector3.new(math.cos(angle) * 34, 1, math.sin(angle) * 34), 0.8, i % 2 == 0 and Color3.fromRGB(110, 255, 170) or Color3.fromRGB(190, 120, 255))
 			end
 			makeCrystal(zoneFolder, zone.Center + Vector3.new(0, 1, -34), 2.4, Color3.fromRGB(110, 255, 200))
+		elseif zone.Id == "Sunset" then
+			-- 巨大な夕日とヤシ
+			local sun = makePart(zoneFolder, "GiantSun", Vector3.new(17, 17, 17), zone.Center + Vector3.new(0, 7, -36), Color3.fromRGB(255, 150, 50), Enum.Material.Neon)
+			sun.Shape = Enum.PartType.Ball
+			sun.CanCollide = false
+			for i = 1, 3 do
+				local angle = i * 2.4
+				makePalm(zoneFolder, zone.Center + Vector3.new(math.cos(angle) * 33, 1, math.sin(angle) * 33))
+			end
+		elseif zone.Id == "Frozen" then
+			-- 氷のクリスタル群
+			for i = 1, 8 do
+				local angle = i * 2.7
+				makeCrystal(zoneFolder, zone.Center + Vector3.new(math.cos(angle) * 34, 1, math.sin(angle) * 34), 0.8, Color3.fromRGB(220, 245, 255))
+			end
+			makeCrystal(zoneFolder, zone.Center + Vector3.new(0, 1, -34), 2.4, Color3.fromRGB(160, 225, 255))
+		elseif zone.Id == "Rainbow" then
+			-- 虹色の小円盤の並びと黄金クリスタル（最終ゾーン）
+			local rainbowColors = { Color3.fromRGB(255, 80, 80), Color3.fromRGB(255, 160, 60), Color3.fromRGB(255, 230, 80), Color3.fromRGB(90, 220, 110), Color3.fromRGB(80, 160, 255), Color3.fromRGB(150, 100, 255) }
+			for i, color in ipairs(rainbowColors) do
+				makeDisc(zoneFolder, "RainbowDisc", 9, 0.4, zone.Center + Vector3.new((i - 3.5) * 10, 1.5, 30), color, Enum.Material.Neon)
+			end
+			makeCrystal(zoneFolder, zone.Center + Vector3.new(0, 1, -34), 2.6, Color3.fromRGB(255, 210, 70))
 		end
 
 		-- ゾーン看板は斜め奥に置く（ランドマークや他の看板と重ならない位置）
@@ -268,7 +291,7 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 	end
 
 	-- ゾーン間をつなぐ飛び石の円盤（海の上にも円を増やして豪華に）
-	for _, span in ipairs({ { 30, 120 }, { 180, 270 }, { 330, 420 }, { 480, 570 } }) do
+	for _, span in ipairs({ { 30, 120 }, { 180, 270 }, { 330, 420 }, { 480, 570 }, { 630, 720 }, { 780, 870 }, { 930, 1020 } }) do
 		for x = span[1], span[2], 18 do
 			local wiggle = math.sin(x * 0.11) * 7
 			makeDisc(world, "SteppingDisc", 9, 0.8, Vector3.new(x, 0.4, wiggle), Color3.fromRGB(235, 240, 245), Enum.Material.Marble)
@@ -298,9 +321,9 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 		makeLamp(world, lampPos)
 	end
 
-	-- ポータル（アーチ付き）
+	-- ポータル（アーチ付き。ゾーン数に応じて等間隔に並べる）
 	for i, zone in ipairs(Config.Zones) do
-		local x = (i - 2) * 14
+		local x = (i - (#Config.Zones + 1) / 2) * 11
 		local pad = makePart(world, "Portal_" .. zone.Id, Vector3.new(9, 0.6, 9), Vector3.new(x, 1.3, 6), Color3.fromRGB(120, 80, 255), Enum.Material.Neon)
 		pad.CanCollide = false
 		pad:SetAttribute("ZoneId", zone.Id)
@@ -313,9 +336,9 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 		prompt.Parent = pad
 		table.insert(prompts, prompt)
 		-- アーチ
-		makePart(world, "ArchPillar", Vector3.new(1, 8, 1), Vector3.new(x - 5, 5, 6), zone.Color, Enum.Material.Marble)
-		makePart(world, "ArchPillar", Vector3.new(1, 8, 1), Vector3.new(x + 5, 5, 6), zone.Color, Enum.Material.Marble)
-		makePart(world, "ArchTop", Vector3.new(11.5, 1.2, 1.2), Vector3.new(x, 9.4, 6), zone.Color, Enum.Material.Neon)
+		makePart(world, "ArchPillar", Vector3.new(1, 8, 1), Vector3.new(x - 4.2, 5, 6), zone.Color, Enum.Material.Marble)
+		makePart(world, "ArchPillar", Vector3.new(1, 8, 1), Vector3.new(x + 4.2, 5, 6), zone.Color, Enum.Material.Marble)
+		makePart(world, "ArchTop", Vector3.new(9.6, 1.2, 1.2), Vector3.new(x, 9.4, 6), zone.Color, Enum.Material.Neon)
 		makeSign(world, Vector3.new(x, 1, -2), zone.Name, Color3.fromRGB(120, 80, 255))
 	end
 
@@ -345,7 +368,7 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 	end
 
 	-- フレーバーショップ
-	local flavorPad = makePart(world, "FlavorShopPad", Vector3.new(9, 0.6, 9), Vector3.new(-38, 1.3, 6), Color3.fromRGB(255, 110, 180), Enum.Material.Neon)
+	local flavorPad = makePart(world, "FlavorShopPad", Vector3.new(9, 0.6, 9), Vector3.new(-38, 1.3, 20), Color3.fromRGB(255, 110, 180), Enum.Material.Neon)
 	flavorPad.CanCollide = false
 	local flavorPrompt = Instance.new("ProximityPrompt")
 	flavorPrompt.Name = "FlavorPrompt"
@@ -354,7 +377,7 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 	flavorPrompt.HoldDuration = 0.4
 	flavorPrompt.MaxActivationDistance = 12
 	flavorPrompt.Parent = flavorPad
-	local flavorBoard = makePart(world, "FlavorBoard", Vector3.new(12, 4, 0.4), Vector3.new(-38, 8.5, -4), Color3.fromRGB(255, 110, 180), Enum.Material.SmoothPlastic)
+	local flavorBoard = makePart(world, "FlavorBoard", Vector3.new(12, 4, 0.4), Vector3.new(-38, 8.5, 12), Color3.fromRGB(255, 110, 180), Enum.Material.SmoothPlastic)
 	flavorBoard.CanCollide = false
 	local flavorGui = Instance.new("SurfaceGui")
 	flavorGui.Face = Enum.NormalId.Front
@@ -372,9 +395,9 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 	flavorGuiBack.Face = Enum.NormalId.Back
 	flavorGuiBack.Parent = flavorBoard
 
-	-- ランキングボード2枚（このサーバー / 週間グローバル）
-	makeBoard(world, "ServerBoard", Vector3.new(30, 7, -8), -35, "🏆 このサーバーの英雄", Color3.fromRGB(40, 60, 120))
-	makeBoard(world, "GlobalBoard", Vector3.new(38, 7, 6), -55, "🌍 週間グローバル TOP", Color3.fromRGB(90, 40, 130))
+	-- ランキングボード2枚（スポーン後方の左右。ポータル列と干渉しない位置）
+	makeBoard(world, "ServerBoard", Vector3.new(-17, 7, 38), 180, "🏆 このサーバーの英雄", Color3.fromRGB(40, 60, 120))
+	makeBoard(world, "GlobalBoard", Vector3.new(17, 7, 38), 180, "🌍 週間グローバル TOP", Color3.fromRGB(90, 40, 130))
 
 	-- 表彰台（上位3人の像が立つ）
 	local podiumColors = { Color3.fromRGB(255, 200, 40), Color3.fromRGB(200, 200, 210), Color3.fromRGB(200, 130, 70) }
