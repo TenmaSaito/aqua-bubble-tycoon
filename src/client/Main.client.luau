@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MarketplaceService = game:GetService("MarketplaceService")
 local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
@@ -104,6 +105,16 @@ task.spawn(function()
 		local charmName = player:GetAttribute("ActiveCharmName")
 		if charmName and charmName ~= "" then
 			table.insert(parts, "🔮 " .. charmName)
+		end
+		local weatherName = workspace:GetAttribute("WeatherName")
+		local weatherEndsAt = workspace:GetAttribute("WeatherEndsAt") or 0
+		if weatherName and weatherName ~= "" and weatherEndsAt > os.time() then
+			table.insert(parts, string.format("🌦 %s あと%d秒", weatherName, weatherEndsAt - os.time()))
+		else
+			local nextWeatherAt = workspace:GetAttribute("NextWeatherAt") or 0
+			if nextWeatherAt > os.time() then
+				table.insert(parts, string.format("☀️ 次の天候まで %d秒", nextWeatherAt - os.time()))
+			end
 		end
 		statusLabel.Text = "  " .. table.concat(parts, "  |  ")
 		task.wait(0.5)
@@ -207,6 +218,13 @@ end)
 local coinsScale = Instance.new("UIScale")
 coinsScale.Parent = coinsLabel
 
+-- 泡ポップ音（コンボが伸びるほど音程が上がる）
+local popSound = Instance.new("Sound")
+popSound.Name = "CollectPop"
+popSound.SoundId = Config.PopSoundId
+popSound.Volume = 0.45
+popSound.Parent = SoundService
+
 local popupOrder = 0
 collectEffectRemote.OnClientEvent:Connect(function(reward: number, rarityId: string, isCrit: boolean, combo: number, mutationName: string, comboWindow: number)
 	displayCombo = combo
@@ -214,6 +232,9 @@ collectEffectRemote.OnClientEvent:Connect(function(reward: number, rarityId: str
 	if comboWindow then
 		serverComboWindow = comboWindow
 	end
+	popSound.PlaybackSpeed = isCrit and 0.75 or (1 + math.min(combo, 24) * 0.025)
+	popSound.Volume = isCrit and 0.7 or 0.45
+	popSound:Play()
 	if reward >= 100 or isCrit then
 		coinsScale.Scale = 1.18
 		TweenService:Create(coinsScale, TweenInfo.new(0.25), { Scale = 1 }):Play()
@@ -662,3 +683,43 @@ task.spawn(function()
 		end
 	end
 end)
+
+-- ワープパネル（解放済みゾーンへの移動）
+local teleportRemote = remotes:WaitForChild("TeleportTo")
+local warpButton = makeSideButton(3, "🌀 WARP", Color3.fromRGB(0, 150, 190))
+local warpPanel = Instance.new("Frame")
+warpPanel.Size = UDim2.new(0, 300, 0, 250)
+warpPanel.Position = UDim2.new(0.5, -150, 0.5, -125)
+warpPanel.BackgroundColor3 = Color3.fromRGB(10, 50, 80)
+warpPanel.BackgroundTransparency = 0.08
+warpPanel.Visible = false
+warpPanel.Parent = gui
+addCorner(warpPanel, 12)
+local warpTitle = makeLabel(warpPanel, UDim2.new(1, -20, 0, 40), UDim2.new(0, 10, 0, 8), "🌀 ワープ先を選ぶ", 19)
+warpTitle.BackgroundTransparency = 1
+warpButton.MouseButton1Click:Connect(function()
+	warpPanel.Visible = not warpPanel.Visible
+end)
+for i, zone in ipairs(Config.Zones) do
+	local zoneButton = Instance.new("TextButton")
+	zoneButton.Size = UDim2.new(1, -40, 0, 52)
+	zoneButton.Position = UDim2.new(0, 20, 0, 52 + (i - 1) * 62)
+	zoneButton.BackgroundColor3 = zone.Color
+	zoneButton.TextColor3 = Color3.new(1, 1, 1)
+	zoneButton.Font = Enum.Font.GothamBold
+	zoneButton.TextSize = 18
+	zoneButton.Text = zone.Name
+	zoneButton.Parent = warpPanel
+	addCorner(zoneButton, 10)
+	local function refreshZoneButton()
+		local unlocked = player:GetAttribute("Unlocked_" .. zone.Id)
+		zoneButton.Text = unlocked and zone.Name or (zone.Name .. "（未解放）")
+		zoneButton.BackgroundColor3 = unlocked and zone.Color or Color3.fromRGB(90, 90, 90)
+	end
+	player:GetAttributeChangedSignal("Unlocked_" .. zone.Id):Connect(refreshZoneButton)
+	refreshZoneButton()
+	zoneButton.MouseButton1Click:Connect(function()
+		teleportRemote:FireServer(zone.Id)
+		warpPanel.Visible = false
+	end)
+end

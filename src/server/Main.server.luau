@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local MessagingService = game:GetService("MessagingService")
+local BadgeService = game:GetService("BadgeService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
@@ -36,6 +37,16 @@ local redeemCodeRemote = makeRemote("RedeemCode")
 local purchaseLegacyRemote = makeRemote("PurchaseLegacy")
 local charmOfferRemote = makeRemote("CharmOffer") -- サーバー → クライアント: チャーム3択の提示
 local charmSelectRemote = makeRemote("CharmSelect")
+local teleportRemote = makeRemote("TeleportTo")
+
+-- バッジ授与（IDが設定されている場合のみ。失敗してもゲームは止めない）
+local function awardBadge(player: Player, badgeId: number)
+	if badgeId and badgeId > 0 then
+		pcall(function()
+			BadgeService:AwardBadge(player.UserId, badgeId)
+		end)
+	end
+end
 local notifyRemote = makeRemote("Notify") -- サーバー → 個人通知
 local collectEffectRemote = makeRemote("CollectEffect") -- サーバー → 本人に回収演出
 local announcementRemote = makeRemote("Announcement") -- サーバー → 全員への告知
@@ -68,9 +79,11 @@ workspace:SetAttribute("FlavorEndsAt", flavorEndsAt)
 -- 天候サイクル: 通常 → イベント → 通常…
 task.spawn(function()
 	while true do
+		workspace:SetAttribute("NextWeatherAt", os.time() + Config.Weather.NormalSeconds)
 		task.wait(Config.Weather.NormalSeconds)
 		local event = Config.Weather.Events[math.random(1, #Config.Weather.Events)]
 		currentWeather = event
+		workspace:SetAttribute("NextWeatherAt", 0)
 		workspace:SetAttribute("WeatherName", event.Name)
 		workspace:SetAttribute("WeatherEndsAt", os.time() + Config.Weather.EventSeconds)
 		Lighting.Ambient = event.SkyColor
@@ -547,6 +560,13 @@ local function collectBubble(player: Player, bubble: BasePart)
 	if tier >= 5 then
 		announce(string.format("✨ %s さんが %s%s の泡をゲット! +%d コイン", player.DisplayName, mutationName, rarity.Name, reward))
 	end
+	if tier >= 6 then
+		awardBadge(player, Config.Badges.FirstMythic)
+	end
+	if player.Stats.TotalEarned.Value >= 100000 and not data.BadgeRichDone then
+		data.BadgeRichDone = true
+		awardBadge(player, Config.Badges.Rich100k)
+	end
 	-- ミシックは全サーバーへ告知（MessagingService、連投は60秒に1回まで）
 	if tier >= 6 and os.time() - (data.LastMythicPublish or 0) >= 60 then
 		data.LastMythicPublish = os.time()
@@ -586,9 +606,9 @@ local function spawnBubble(zone: any)
 		bubble.Transparency = 0.1
 	end
 
-	-- レアリティ演出: 光とキラキラと名札
+	-- レアリティ演出: 光とキラキラと名札（v3.1で発光は控えめに調整）
 	local tier = rarityIndex(rarity.Id)
-	if tier >= 3 then
+	if tier >= 4 then
 		local sparkles = Instance.new("Sparkles")
 		sparkles.SparkleColor = rarity.Color
 		sparkles.Parent = bubble
@@ -596,8 +616,8 @@ local function spawnBubble(zone: any)
 	if tier >= 5 then
 		local light = Instance.new("PointLight")
 		light.Color = rarity.Color
-		light.Range = 18
-		light.Brightness = 2
+		light.Range = 12
+		light.Brightness = 1
 		light.Parent = bubble
 	end
 	if tier >= 4 then
@@ -770,6 +790,7 @@ requestRebirthRemote.OnServerEvent:Connect(function(player)
 	end
 	local data = sessions[player]
 	player.leaderstats.Rebirths.Value += 1
+	awardBadge(player, Config.Badges.FirstRebirth)
 	local gainedPoints = player.leaderstats.Rebirths.Value
 	player.Stats.LegacyPoints.Value += gainedPoints
 	-- リセットするのはコインとレベルだけ（ゾーン・図鑑・ミッションは保持する）
@@ -853,6 +874,25 @@ charmSelectRemote.OnServerEvent:Connect(function(player, charmId)
 	player:SetAttribute("ActiveCharmName", charm and charm.Name or "")
 	applyStats(player)
 	notify(player, string.format("🔮 チャーム「%s」を選んだ! %s", charm and charm.Name or "", charm and charm.Description or ""))
+end)
+
+-- ワープ（解放済みゾーンへの瞬間移動。PS99の転生特典に倣った便利機能）
+teleportRemote.OnServerEvent:Connect(function(player, zoneId)
+	if type(zoneId) ~= "string" then
+		return
+	end
+	local data = sessions[player]
+	if not data or not data.UnlockedZones[zoneId] then
+		return
+	end
+	for _, zone in ipairs(Config.Zones) do
+		if zone.Id == zoneId then
+			local character = player.Character
+			if character then
+				character:PivotTo(CFrame.new(zone.Center + Vector3.new(0, 6, 20)))
+			end
+		end
+	end
 end)
 
 redeemCodeRemote.OnServerEvent:Connect(function(player, code)
@@ -983,10 +1023,28 @@ Players.PlayerAdded:Connect(function(player)
 				local aura = Instance.new("ParticleEmitter")
 				aura.Color = ColorSequence.new(rebirths.Value >= 5 and Color3.fromRGB(255, 190, 60) or Color3.fromRGB(110, 220, 255))
 				aura.Lifetime = NumberRange.new(0.8, 1.4)
-				aura.Rate = 14
+				aura.Rate = 8
 				aura.Speed = NumberRange.new(1, 3)
 				aura.Size = NumberSequence.new(1.1)
 				aura.Parent = root
+			end
+			-- 上位称号のトレイル（累計100,000以上＝バブルマスター級）
+			local earned = statsFolder:FindFirstChild("TotalEarned")
+			if root and earned and earned.Value >= 100000 then
+				local title = Config.TitleFor(earned.Value)
+				local att0 = Instance.new("Attachment")
+				att0.Position = Vector3.new(0, 1.2, 0)
+				att0.Parent = root
+				local att1 = Instance.new("Attachment")
+				att1.Position = Vector3.new(0, -1.2, 0)
+				att1.Parent = root
+				local trail = Instance.new("Trail")
+				trail.Attachment0 = att0
+				trail.Attachment1 = att1
+				trail.Color = ColorSequence.new(title.Color)
+				trail.Lifetime = 0.45
+				trail.MinLength = 0.1
+				trail.Parent = root
 			end
 		end
 	end)

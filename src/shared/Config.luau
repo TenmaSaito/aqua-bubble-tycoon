@@ -7,7 +7,17 @@
 local Config = {}
 
 Config.GameName = "Aqua Bubble Tycoon"
-Config.Version = "v3"
+Config.Version = "v3.1"
+
+-- 泡を取ったときのポップ音（Roblox標準サウンド。差し替えたい場合はここに rbxassetid を入れる）
+Config.PopSoundId = "rbxasset://sounds/pop.wav"
+
+-- バッジ（Creator Dashboard でバッジを作成し、IDを入れると自動で授与される。0は無効）
+Config.Badges = {
+	FirstMythic = 0, -- 初めてミシックの泡をゲット
+	FirstRebirth = 0, -- 初めてのリバース
+	Rich100k = 0, -- 累計100,000コイン到達
+}
 Config.DataStoreName = "AquaBubbleTycoon_v1" -- v1のセーブを引き継ぐため名前は変えない
 Config.AutosaveSeconds = 120
 

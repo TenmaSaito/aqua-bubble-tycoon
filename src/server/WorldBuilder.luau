@@ -103,8 +103,8 @@ local function makeLamp(parent: Instance, position: Vector3)
 	bulb.CanCollide = false
 	local light = Instance.new("PointLight")
 	light.Color = Color3.fromRGB(255, 230, 170)
-	light.Range = 22
-	light.Brightness = 1.2
+	light.Range = 16
+	light.Brightness = 0.7
 	light.Parent = bulb
 end
 
@@ -114,8 +114,8 @@ local function makeCrystal(parent: Instance, position: Vector3, scale: number, c
 	crystal.CanCollide = false
 	local light = Instance.new("PointLight")
 	light.Color = color
-	light.Range = 16
-	light.Brightness = 1.4
+	light.Range = 12
+	light.Brightness = 0.8
 	light.Parent = crystal
 	return crystal
 end
@@ -147,6 +147,22 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 		makePart(zoneFolder, "Island", Vector3.new(92, 2, 92), zone.Center, zone.Color, Enum.Material.Sand)
 		-- 島の内側サークル（色分けされた活動エリア）
 		makeDisc(zoneFolder, "Disc", 76, 0.5, zone.Center + Vector3.new(0, 1.1, 0), zone.Color:Lerp(Color3.new(1, 1, 1), 0.18), Enum.Material.SmoothPlastic)
+		-- 円盤の重なりで島に段差と厚みを持たせる（外周スカート2段）
+		makeDisc(zoneFolder, "SkirtOuter", 108, 1, zone.Center + Vector3.new(0, -0.4, 0), zone.Color:Lerp(Color3.new(0, 0, 0), 0.12), Enum.Material.Sand)
+		makeDisc(zoneFolder, "SkirtInner", 98, 1, zone.Center + Vector3.new(0, 0.3, 0), zone.Color:Lerp(Color3.new(1, 1, 1), 0.08), Enum.Material.Sand)
+		-- 小さな円形プラザを散らして床にリズムを作る
+		for i = 1, 4 do
+			local angle = i * 1.9 + index * 0.7
+			local r = 18 + (i % 2) * 12
+			makeDisc(zoneFolder, "MiniPlaza", math.random(10, 17), 0.3, zone.Center + Vector3.new(math.cos(angle) * r, 1.45, math.sin(angle) * r), zone.Color:Lerp(Color3.new(1, 1, 1), 0.35), Enum.Material.Marble)
+		end
+		-- 島の縁を低い壁で囲う（外の殺風景を隠し、ゾーン感を強める）
+		for i = 1, 14 do
+			local angle = (i / 14) * math.pi * 2
+			local wallPos = zone.Center + Vector3.new(math.cos(angle) * 44, 2.2, math.sin(angle) * 44)
+			local wall = makePart(zoneFolder, "RimWall", Vector3.new(21, 2.4, 1.2), wallPos, zone.Color:Lerp(Color3.new(0, 0, 0), 0.05), Enum.Material.Marble)
+			wall.CFrame = CFrame.new(wallPos) * CFrame.Angles(0, -angle + math.pi / 2, 0)
+		end
 
 		for i = 1, 8 do
 			local angle = (i / 8) * math.pi * 2 + index
@@ -183,6 +199,19 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 		end
 
 		makeSign(zoneFolder, zone.Center + Vector3.new(0, 1, -40), string.format("%s\n泡の価値: %d", zone.Name, zone.BubbleValue), Color3.fromRGB(30, 120, 200))
+	end
+
+	-- ゾーン間をつなぐ飛び石の円盤（海の上にも円を増やして豪華に）
+	for _, span in ipairs({ { 30, 120 }, { 180, 270 } }) do
+		for x = span[1], span[2], 18 do
+			local wiggle = math.sin(x * 0.11) * 7
+			makeDisc(world, "SteppingDisc", 9, 0.8, Vector3.new(x, 0.4, wiggle), Color3.fromRGB(235, 240, 245), Enum.Material.Marble)
+		end
+	end
+	-- 広場の周りにも小円盤のリング
+	for i = 1, 10 do
+		local angle = (i / 10) * math.pi * 2
+		makeDisc(world, "PlazaRingDisc", 5.5, 0.4, Vector3.new(math.cos(angle) * 31, 1.35, 10 + math.sin(angle) * 31), i % 2 == 0 and Color3.fromRGB(120, 215, 255) or Color3.fromRGB(255, 255, 255), Enum.Material.Marble)
 	end
 
 	-- スポーンと広場
@@ -237,9 +266,17 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 	landmark.CanCollide = false
 	local landmarkLight = Instance.new("PointLight")
 	landmarkLight.Color = Color3.fromRGB(120, 210, 255)
-	landmarkLight.Range = 40
-	landmarkLight.Brightness = 2
+	landmarkLight.Range = 24
+	landmarkLight.Brightness = 1
 	landmarkLight.Parent = landmark
+	-- ランドマーク泡の周りを回る小さい泡のリング
+	for i = 1, 8 do
+		local angle = (i / 8) * math.pi * 2
+		local orb = makePart(fountain, "OrbitBubble", Vector3.new(2.2, 2.2, 2.2), Vector3.new(-24 + math.cos(angle) * 8.5, 15, 22 + math.sin(angle) * 8.5), Color3.fromRGB(160, 225, 255), Enum.Material.Glass)
+		orb.Shape = Enum.PartType.Ball
+		orb.Transparency = 0.3
+		orb.CanCollide = false
+	end
 
 	-- フレーバーショップ
 	local flavorPad = makePart(world, "FlavorShopPad", Vector3.new(9, 0.6, 9), Vector3.new(-24, 1.3, 6), Color3.fromRGB(255, 110, 180), Enum.Material.Neon)
