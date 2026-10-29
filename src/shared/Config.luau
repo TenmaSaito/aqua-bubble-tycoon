@@ -7,7 +7,7 @@
 local Config = {}
 
 Config.GameName = "Aqua Bubble Tycoon"
-Config.Version = "v3.3.2"
+Config.Version = "v3.3.3"
 
 -- 泡を取ったときのポップ音。"" の場合はクライアントが実在する標準サウンドを自動で選ぶ。
 -- 自分でアップロードした音源を使いたい場合は、ここに rbxassetid://... を入れる

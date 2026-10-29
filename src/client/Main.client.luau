@@ -218,11 +218,24 @@ end)
 local coinsScale = Instance.new("UIScale")
 coinsScale.Parent = coinsLabel
 
--- 泡ポップ音（コンボが伸びるほど音程が上がる）
-local popSound = Instance.new("Sound")
-popSound.Name = "CollectPop"
-popSound.Volume = 0.55
-popSound.Parent = SoundService
+-- 泡ポップ音: 単一のSoundだと再生中は次の音が鳴らないので、プールで重ねて鳴らす
+local POP_POOL_SIZE = 10
+local popPool = {}
+for i = 1, POP_POOL_SIZE do
+	local sound = Instance.new("Sound")
+	sound.Name = "CollectPop" .. i
+	sound.Volume = 0.55
+	sound.Parent = SoundService
+	table.insert(popPool, sound)
+end
+local popPoolIndex = 0
+local function playPop(combo: number, isCrit: boolean)
+	popPoolIndex = (popPoolIndex % POP_POOL_SIZE) + 1
+	local sound = popPool[popPoolIndex]
+	sound.PlaybackSpeed = isCrit and 0.75 or (1 + math.min(combo, 24) * 0.025)
+	sound.Volume = isCrit and 0.7 or 0.55
+	sound:Play()
+end
 
 -- 音源の自動選択: 以前指定した rbxasset://sounds/pop.wav は現在のRobloxに存在せず無音だった。
 -- ContentProviderで実際に読み込めるか確認しながら、候補を順に試す
@@ -239,12 +252,16 @@ task.spawn(function()
 	}) do
 		table.insert(candidates, candidate)
 	end
+	local probe = popPool[1]
 	for _, soundId in ipairs(candidates) do
-		popSound.SoundId = soundId
+		probe.SoundId = soundId
 		pcall(function()
-			ContentProvider:PreloadAsync({ popSound })
+			ContentProvider:PreloadAsync({ probe })
 		end)
-		if popSound.IsLoaded and popSound.TimeLength > 0 then
+		if probe.IsLoaded and probe.TimeLength > 0 then
+			for _, sound in ipairs(popPool) do
+				sound.SoundId = soundId
+			end
 			break
 		end
 	end
@@ -257,9 +274,7 @@ collectEffectRemote.OnClientEvent:Connect(function(reward: number, rarityId: str
 	if comboWindow then
 		serverComboWindow = comboWindow
 	end
-	popSound.PlaybackSpeed = isCrit and 0.75 or (1 + math.min(combo, 24) * 0.025)
-	popSound.Volume = isCrit and 0.7 or 0.45
-	popSound:Play()
+	playPop(combo, isCrit)
 	if reward >= 100 or isCrit then
 		coinsScale.Scale = 1.18
 		TweenService:Create(coinsScale, TweenInfo.new(0.25), { Scale = 1 }):Play()

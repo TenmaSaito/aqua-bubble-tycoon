@@ -121,13 +121,46 @@ local function makeCrystal(parent: Instance, position: Vector3, scale: number, c
 end
 
 function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, TextLabel)
+	-- StudioのBaseplateテンプレートの残骸を消す（グレーの格子床が海から透けて見える問題）
+	local templateBaseplate = workspace:FindFirstChild("Baseplate")
+	if templateBaseplate and templateBaseplate:IsA("BasePart") then
+		templateBaseplate:Destroy()
+	end
+	local templateSpawn = workspace:FindFirstChild("SpawnLocation")
+	if templateSpawn and templateSpawn:IsA("SpawnLocation") then
+		templateSpawn:Destroy()
+	end
+
 	local world = Instance.new("Folder")
 	world.Name = "GameWorld"
 	world.Parent = workspace
 
-	local sea = makePart(world, "Sea", Vector3.new(760, 1, 300), Vector3.new(150, -1.2, 0), Color3.fromRGB(40, 140, 220), Enum.Material.SmoothPlastic)
-	sea.Transparency = 0.25
+	local sea = makePart(world, "Sea", Vector3.new(1500, 1, 950), Vector3.new(150, -1.2, 0), Color3.fromRGB(35, 130, 215), Enum.Material.SmoothPlastic)
+	sea.Transparency = 0.12
 	sea.CanCollide = false
+
+	-- 地平線の物寂しさ対策: 遠景の小島と雲を散らす（どちらも当たり判定なし）
+	local horizon = Instance.new("Folder")
+	horizon.Name = "Horizon"
+	horizon.Parent = world
+	for i = 1, 6 do
+		local angle = (i / 6) * math.pi * 2 + 0.4
+		local dist = math.random(300, 430)
+		local islandPos = Vector3.new(150 + math.cos(angle) * dist, 0, math.sin(angle) * dist)
+		local isle = makeDisc(horizon, "FarIsland", math.random(40, 70), 3, islandPos, Color3.fromRGB(238, 220, 175), Enum.Material.Sand)
+		isle.CanCollide = false
+		local hill = makePart(horizon, "FarHill", Vector3.new(16, 10, 16), islandPos + Vector3.new(0, 5, 0), Color3.fromRGB(90, 190, 110), Enum.Material.Grass)
+		hill.Shape = Enum.PartType.Ball
+		hill.CanCollide = false
+	end
+	for i = 1, 14 do
+		local cloudPos = Vector3.new(math.random(-350, 650), math.random(55, 95), math.random(-320, 320))
+		for j = 1, 3 do
+			local puff = makePart(horizon, "Cloud", Vector3.new(math.random(18, 30), 6, math.random(12, 20)), cloudPos + Vector3.new(j * 11 - 11, math.random(-1, 2), math.random(-4, 4)), Color3.fromRGB(255, 255, 255), Enum.Material.SmoothPlastic)
+			puff.Shape = Enum.PartType.Ball
+			puff.CanCollide = false
+		end
+	end
 
 	local bubbleFolder = Instance.new("Folder")
 	bubbleFolder.Name = "Bubbles"
