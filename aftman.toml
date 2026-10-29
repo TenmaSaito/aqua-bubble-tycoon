@@ -1,0 +1,3 @@
+# 開発ツールのバージョン固定（aftman / rokit で使う）
+[tools]
+rojo = "rojo-rbx/rojo@7.4.4"
