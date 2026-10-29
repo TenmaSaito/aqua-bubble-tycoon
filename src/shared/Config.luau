@@ -7,7 +7,7 @@
 local Config = {}
 
 Config.GameName = "Aqua Bubble Tycoon"
-Config.Version = "v3.3"
+Config.Version = "v3.3.1"
 
 -- 泡を取ったときのポップ音（Roblox標準サウンド。差し替えたい場合はここに rbxassetid を入れる）
 Config.PopSoundId = "rbxasset://sounds/pop.wav"
@@ -97,7 +97,7 @@ end
 -- 天候イベント（Grow a Garden式ミューテーション）
 -- 通常時間のあとランダムで1つ発生し、その間に生まれた泡の一部が変異する
 Config.Weather = {
-	NormalSeconds = 240, -- 通常の長さ
+	NormalSeconds = 120, -- 通常の長さ（ドパ盛り調整: 240→120秒）
 	EventSeconds = 90, -- イベントの長さ
 	Events = {
 		{ Id = "Golden", Name = "黄金の雨", MutationName = "金", MutationChance = 0.3, MutationMultiplier = 20, Color = Color3.fromRGB(255, 200, 60), SkyColor = Color3.fromRGB(255, 230, 170) },
@@ -160,7 +160,7 @@ function Config.UpgradeCost(upgradeId: string, currentLevel: number): number
 end
 
 function Config.RebirthCost(rebirths: number): number
-	return 10000 * (3 ^ rebirths)
+	return 5000 * (3 ^ rebirths)
 end
 
 -- コンボ: 3秒以内に集め続けると加算。倍率は最大+200%（100コンボ）
