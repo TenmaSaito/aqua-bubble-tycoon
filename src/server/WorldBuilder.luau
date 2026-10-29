@@ -168,11 +168,12 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 		local barrier = Instance.new("Folder")
 		barrier.Name = "Barrier_" .. zone.Id
 		barrier.Parent = zoneFolder
+		-- 壁は厚め（4スタッド）にする: 高速移動時に薄い壁をすり抜ける物理トンネリング対策
 		local wallSpecs = {
-			{ Vector3.new(96, 16, 1.5), Vector3.new(0, 8, -48) },
-			{ Vector3.new(96, 16, 1.5), Vector3.new(0, 8, 48) },
-			{ Vector3.new(1.5, 16, 96), Vector3.new(-48, 8, 0) },
-			{ Vector3.new(1.5, 16, 96), Vector3.new(48, 8, 0) },
+			{ Vector3.new(100, 16, 4), Vector3.new(0, 8, -48) },
+			{ Vector3.new(100, 16, 4), Vector3.new(0, 8, 48) },
+			{ Vector3.new(4, 16, 100), Vector3.new(-48, 8, 0) },
+			{ Vector3.new(4, 16, 100), Vector3.new(48, 8, 0) },
 		}
 		for _, spec in ipairs(wallSpecs) do
 			local wallPart = makePart(barrier, "BarrierWall", spec[1], zone.Center + spec[2], zone.Color, Enum.Material.Glass)

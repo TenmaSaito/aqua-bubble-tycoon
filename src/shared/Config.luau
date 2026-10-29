@@ -7,7 +7,7 @@
 local Config = {}
 
 Config.GameName = "Aqua Bubble Tycoon"
-Config.Version = "v3.2"
+Config.Version = "v3.3"
 
 -- 泡を取ったときのポップ音（Roblox標準サウンド。差し替えたい場合はここに rbxassetid を入れる）
 Config.PopSoundId = "rbxasset://sounds/pop.wav"

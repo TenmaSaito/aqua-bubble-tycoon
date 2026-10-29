@@ -724,31 +724,4 @@ for i, zone in ipairs(Config.Zones) do
 	end)
 end
 
--- ゾーン結界: 自分の解放状態に合わせて壁の当たり判定と透明度を切り替える
--- （キャラクターの物理はクライアント側で計算されるので、これでプレイヤーごとに壁が機能する）
-task.spawn(function()
-	local gameWorld = workspace:WaitForChild("GameWorld")
-	local function refreshBarrier(zone)
-		local zoneFolder = gameWorld:WaitForChild("Zone_" .. zone.Id, 10)
-		if not zoneFolder then
-			return
-		end
-		local barrier = zoneFolder:WaitForChild("Barrier_" .. zone.Id, 10)
-		if not barrier then
-			return
-		end
-		local unlocked = player:GetAttribute("Unlocked_" .. zone.Id) == true
-		for _, wallPart in ipairs(barrier:GetChildren()) do
-			if wallPart:IsA("BasePart") then
-				wallPart.CanCollide = not unlocked
-				wallPart.Transparency = unlocked and 0.9 or 0.45
-			end
-		end
-	end
-	for _, zone in ipairs(Config.Zones) do
-		refreshBarrier(zone)
-		player:GetAttributeChangedSignal("Unlocked_" .. zone.Id):Connect(function()
-			refreshBarrier(zone)
-		end)
-	end
-end)
+-- ゾーン結界の切り替えは Barrier.client.luau が担当する（エラー耐性のため分離）

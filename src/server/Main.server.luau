@@ -283,6 +283,8 @@ local function refreshGamePasses(player: Player)
 	data.HasLucky = owns(Config.GamePasses.Lucky)
 	player:SetAttribute("HasDoubleCoins", data.HasDoubleCoins)
 	player:SetAttribute("HasVip", data.HasVip)
+	-- パス確認が終わったタイミングでも速度を再適用する（VIPの+8が初回スポーンに間に合わない問題）
+	applyStats(player)
 end
 
 -- フレンドが同じサーバーにいると+10%（Fischの共有体験ボーナス式）
@@ -325,10 +327,17 @@ Players.PlayerAdded:Connect(function(player)
 	buildValueObjects(player, data)
 	syncLegacyAttributes(player, data)
 	refreshGamePasses(player)
-	player.CharacterAdded:Connect(function()
-		task.wait(0.2)
+	player.CharacterAdded:Connect(function(character)
+		-- Humanoid の生成を待ってから速度を適用する（タイミングで外れるバグ対策）
+		character:WaitForChild("Humanoid", 5)
 		applyStats(player)
 	end)
+	-- 初回スポーンが CharacterAdded 登録より先に終わる場合があるので、こちらでも適用する
+	if player.Character then
+		task.delay(0.5, function()
+			applyStats(player)
+		end)
+	end
 
 	-- オフライン報酬（泡ジャー）: 前回退出からの経過ぶんを上限付きで付与
 	local lastSeen = data.LastSeen or 0
@@ -1146,6 +1155,10 @@ task.spawn(function()
 			end)
 			for rank = 1, math.min(3, #sorted) do
 				local p = sorted[rank]
+				-- 参加直後で Stats がまだ無いプレイヤーはスキップ（ループ全体が止まるのを防ぐ）
+				if not (p:FindFirstChild("Stats") and p.Stats:FindFirstChild("TotalEarned")) then
+					continue
+				end
 				local basePos = Vector3.new(14 + (rank - 1) * 6.5, podiumTops[rank], 26)
 				local model = Instance.new("Model")
 				model.Name = "Statue_" .. p.Name
