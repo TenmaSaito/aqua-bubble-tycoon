@@ -421,12 +421,16 @@ local function collectBubble(player: Player, bubble: BasePart)
 	if bubble:GetAttribute("Collected") then
 		return
 	end
-	bubble:SetAttribute("Collected", true)
 	local data = sessions[player]
 	if not data then
-		bubble:Destroy()
 		return
 	end
+	-- 未解放ゾーンの泡は回収できない（歩いて侵入する抜け道を塞ぐ。泡は残す）
+	local bubbleZone = bubble:GetAttribute("Zone") or "Beach"
+	if not data.UnlockedZones[bubbleZone] then
+		return
+	end
+	bubble:SetAttribute("Collected", true)
 
 	local zoneValue = bubble:GetAttribute("Value") or 1
 	local rarity = Config.Rarities[rarityIndex(bubble:GetAttribute("RarityId") or "Common")]
@@ -1227,6 +1231,40 @@ task.spawn(function()
 			character:PivotTo(CFrame.new(0, 5, 20))
 		end
 	end)
+end)
+
+-- ゾーン侵入の最終防衛線＋落下セーフティ（1秒ごと）
+-- 結界壁はクライアント側判定なので、改造対策としてサーバーでも位置を検証する
+task.spawn(function()
+	while true do
+		task.wait(1)
+		for _, player in ipairs(Players:GetPlayers()) do
+			local data = sessions[player]
+			local character = player.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			if data and root then
+				-- 海に落ちたらスポーンへ戻す
+				if root.Position.Y < -5 then
+					character:PivotTo(CFrame.new(0, 6, 20))
+				else
+					for _, zone in ipairs(Config.Zones) do
+						if not data.UnlockedZones[zone.Id] then
+							local dx = root.Position.X - zone.Center.X
+							local dz = root.Position.Z - zone.Center.Z
+							if math.abs(dx) < 52 and math.abs(dz) < 52 and root.Position.Y < 30 then
+								character:PivotTo(CFrame.new(0, 6, 20))
+								if os.clock() - (data.LastGateWarn or 0) > 10 then
+									data.LastGateWarn = os.clock()
+									notify(player, string.format("🔒 %s はまだ解放されていないよ（ポータルで %d コイン）", zone.Name, zone.UnlockCost))
+								end
+								break
+							end
+						end
+					end
+				end
+			end
+		end
+	end
 end)
 
 print("[AquaBubble] Server started: " .. Config.GameName .. " " .. Config.Version)

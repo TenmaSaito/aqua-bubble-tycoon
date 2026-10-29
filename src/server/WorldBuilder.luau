@@ -163,6 +163,21 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 			local wall = makePart(zoneFolder, "RimWall", Vector3.new(21, 2.4, 1.2), wallPos, zone.Color:Lerp(Color3.new(0, 0, 0), 0.05), Enum.Material.Marble)
 			wall.CFrame = CFrame.new(wallPos) * CFrame.Angles(0, -angle + math.pi / 2, 0)
 		end
+		-- ゾーンを囲う大きな結界壁（未解放のプレイヤーは物理的に入れない。
+		-- 当たり判定はクライアント側で自分の解放状態に合わせて切り替える）
+		local barrier = Instance.new("Folder")
+		barrier.Name = "Barrier_" .. zone.Id
+		barrier.Parent = zoneFolder
+		local wallSpecs = {
+			{ Vector3.new(96, 16, 1.5), Vector3.new(0, 8, -48) },
+			{ Vector3.new(96, 16, 1.5), Vector3.new(0, 8, 48) },
+			{ Vector3.new(1.5, 16, 96), Vector3.new(-48, 8, 0) },
+			{ Vector3.new(1.5, 16, 96), Vector3.new(48, 8, 0) },
+		}
+		for _, spec in ipairs(wallSpecs) do
+			local wallPart = makePart(barrier, "BarrierWall", spec[1], zone.Center + spec[2], zone.Color, Enum.Material.Glass)
+			wallPart.Transparency = 0.45
+		end
 
 		for i = 1, 8 do
 			local angle = (i / 8) * math.pi * 2 + index
