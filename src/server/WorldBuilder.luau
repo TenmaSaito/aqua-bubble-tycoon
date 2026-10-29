@@ -245,13 +245,30 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 				makeCrystal(zoneFolder, zone.Center + Vector3.new(math.cos(angle) * 34, 1, math.sin(angle) * 34), 0.7, Color3.fromRGB(90, 220, 255))
 			end
 			makeCrystal(zoneFolder, zone.Center + Vector3.new(0, 1, -34), 2.2, Color3.fromRGB(120, 120, 255))
+		elseif zone.Id == "Lagoon" then
+			-- ヤシと大きな巻き貝がランドマーク
+			for i = 1, 3 do
+				local angle = i * 2.1
+				makePalm(zoneFolder, zone.Center + Vector3.new(math.cos(angle) * 33, 1, math.sin(angle) * 33))
+			end
+			local conch = makePart(zoneFolder, "GiantConch", Vector3.new(13, 9, 9), zone.Center + Vector3.new(0, 4, -33), Color3.fromRGB(255, 205, 150), Enum.Material.SmoothPlastic)
+			conch.Shape = Enum.PartType.Ball
+			conch.CFrame = CFrame.new(conch.Position) * CFrame.Angles(0, 0, math.rad(35))
+		elseif zone.Id == "Aurora" then
+			-- 緑と紫に光るオーロラクリスタル
+			for i = 1, 8 do
+				local angle = i * 2.7
+				makeCrystal(zoneFolder, zone.Center + Vector3.new(math.cos(angle) * 34, 1, math.sin(angle) * 34), 0.8, i % 2 == 0 and Color3.fromRGB(110, 255, 170) or Color3.fromRGB(190, 120, 255))
+			end
+			makeCrystal(zoneFolder, zone.Center + Vector3.new(0, 1, -34), 2.4, Color3.fromRGB(110, 255, 200))
 		end
 
-		makeSign(zoneFolder, zone.Center + Vector3.new(0, 1, -40), string.format("%s\n泡の価値: %d", zone.Name, zone.BubbleValue), Color3.fromRGB(30, 120, 200))
+		-- ゾーン看板は斜め奥に置く（ランドマークや他の看板と重ならない位置）
+		makeSign(zoneFolder, zone.Center + Vector3.new(-30, 1, -30), string.format("%s\n泡の価値: %d", zone.Name, zone.BubbleValue), Color3.fromRGB(30, 120, 200))
 	end
 
 	-- ゾーン間をつなぐ飛び石の円盤（海の上にも円を増やして豪華に）
-	for _, span in ipairs({ { 30, 120 }, { 180, 270 } }) do
+	for _, span in ipairs({ { 30, 120 }, { 180, 270 }, { 330, 420 }, { 480, 570 } }) do
 		for x = span[1], span[2], 18 do
 			local wiggle = math.sin(x * 0.11) * 7
 			makeDisc(world, "SteppingDisc", 9, 0.8, Vector3.new(x, 0.4, wiggle), Color3.fromRGB(235, 240, 245), Enum.Material.Marble)
@@ -328,7 +345,7 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 	end
 
 	-- フレーバーショップ
-	local flavorPad = makePart(world, "FlavorShopPad", Vector3.new(9, 0.6, 9), Vector3.new(-24, 1.3, 6), Color3.fromRGB(255, 110, 180), Enum.Material.Neon)
+	local flavorPad = makePart(world, "FlavorShopPad", Vector3.new(9, 0.6, 9), Vector3.new(-38, 1.3, 6), Color3.fromRGB(255, 110, 180), Enum.Material.Neon)
 	flavorPad.CanCollide = false
 	local flavorPrompt = Instance.new("ProximityPrompt")
 	flavorPrompt.Name = "FlavorPrompt"
@@ -337,7 +354,7 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, Te
 	flavorPrompt.HoldDuration = 0.4
 	flavorPrompt.MaxActivationDistance = 12
 	flavorPrompt.Parent = flavorPad
-	local flavorBoard = makePart(world, "FlavorBoard", Vector3.new(12, 4, 0.4), Vector3.new(-24, 8, -2), Color3.fromRGB(255, 110, 180), Enum.Material.SmoothPlastic)
+	local flavorBoard = makePart(world, "FlavorBoard", Vector3.new(12, 4, 0.4), Vector3.new(-38, 8.5, -4), Color3.fromRGB(255, 110, 180), Enum.Material.SmoothPlastic)
 	flavorBoard.CanCollide = false
 	local flavorGui = Instance.new("SurfaceGui")
 	flavorGui.Face = Enum.NormalId.Front

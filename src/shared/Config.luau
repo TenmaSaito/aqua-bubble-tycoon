@@ -7,7 +7,7 @@
 local Config = {}
 
 Config.GameName = "Aqua Bubble Tycoon"
-Config.Version = "v3.3.3"
+Config.Version = "v3.4"
 
 -- 泡を取ったときのポップ音。"" の場合はクライアントが実在する標準サウンドを自動で選ぶ。
 -- 自分でアップロードした音源を使いたい場合は、ここに rbxassetid://... を入れる
@@ -42,6 +42,8 @@ Config.Zones = {
 	{ Id = "Beach", Name = "ビーチ", UnlockCost = 0, BubbleValue = 1, MaxBubbles = 18, RareBonus = 1.0, Center = Vector3.new(0, 0, 0), Color = Color3.fromRGB(245, 222, 160) },
 	{ Id = "Coral", Name = "サンゴ礁", UnlockCost = 500, BubbleValue = 5, MaxBubbles = 18, RareBonus = 1.35, Center = Vector3.new(150, 0, 0), Color = Color3.fromRGB(255, 150, 170) },
 	{ Id = "Deep", Name = "深海", UnlockCost = 5000, BubbleValue = 25, MaxBubbles = 18, RareBonus = 1.8, Center = Vector3.new(300, 0, 0), Color = Color3.fromRGB(70, 110, 220) },
+	{ Id = "Lagoon", Name = "ラグーン", UnlockCost = 25000, BubbleValue = 100, MaxBubbles = 20, RareBonus = 2.2, Center = Vector3.new(450, 0, 0), Color = Color3.fromRGB(60, 220, 190) },
+	{ Id = "Aurora", Name = "オーロラ海域", UnlockCost = 100000, BubbleValue = 400, MaxBubbles = 20, RareBonus = 2.8, Center = Vector3.new(600, 0, 0), Color = Color3.fromRGB(150, 120, 255) },
 }
 
 -- レアリティ階段（確率は全表示する。Weight合計に対する割合がそのまま確率）

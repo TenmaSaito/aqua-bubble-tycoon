@@ -232,7 +232,7 @@ local popPoolIndex = 0
 local function playPop(combo: number, isCrit: boolean)
 	popPoolIndex = (popPoolIndex % POP_POOL_SIZE) + 1
 	local sound = popPool[popPoolIndex]
-	sound.PlaybackSpeed = isCrit and 0.75 or (1 + math.min(combo, 24) * 0.025)
+	sound.PlaybackSpeed = isCrit and 0.95 or (1.4 + math.min(combo, 24) * 0.03)
 	sound.Volume = isCrit and 0.7 or 0.55
 	sound:Play()
 end
@@ -724,12 +724,51 @@ task.spawn(function()
 	end
 end)
 
+-- 天候イベントのド派手バナー＋全画面フラッシュ
+local flashFrame = Instance.new("Frame")
+flashFrame.Size = UDim2.fromScale(1, 1)
+flashFrame.BackgroundColor3 = Color3.new(1, 1, 1)
+flashFrame.BackgroundTransparency = 1
+flashFrame.BorderSizePixel = 0
+flashFrame.Parent = gui
+
+local weatherBanner = makeLabel(gui, UDim2.new(0, 760, 0, 96), UDim2.new(0.5, -380, 0, 110), "", 42)
+weatherBanner.Visible = false
+weatherBanner.TextColor3 = Color3.new(1, 1, 1)
+addCorner(weatherBanner, 16)
+local bannerScale = Instance.new("UIScale")
+bannerScale.Parent = weatherBanner
+
+workspace:GetAttributeChangedSignal("WeatherName"):Connect(function()
+	local weatherName = workspace:GetAttribute("WeatherName")
+	if weatherName and weatherName ~= "" then
+		local eventColor = Color3.fromRGB(120, 200, 255)
+		for _, event in ipairs(Config.Weather.Events) do
+			if event.Name == weatherName then
+				eventColor = event.Color
+			end
+		end
+		weatherBanner.Text = "🌦 " .. weatherName .. " 発生!! 🌦"
+		weatherBanner.BackgroundColor3 = eventColor
+		weatherBanner.BackgroundTransparency = 0.15
+		weatherBanner.Visible = true
+		bannerScale.Scale = 1.35
+		TweenService:Create(bannerScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+		flashFrame.BackgroundColor3 = eventColor
+		flashFrame.BackgroundTransparency = 0.45
+		TweenService:Create(flashFrame, TweenInfo.new(0.8), { BackgroundTransparency = 1 }):Play()
+		task.delay(3.2, function()
+			weatherBanner.Visible = false
+		end)
+	end
+end)
+
 -- ワープパネル（解放済みゾーンへの移動）
 local teleportRemote = remotes:WaitForChild("TeleportTo")
 local warpButton = makeSideButton(3, "🌀 WARP", Color3.fromRGB(0, 150, 190))
 local warpPanel = Instance.new("Frame")
-warpPanel.Size = UDim2.new(0, 300, 0, 250)
-warpPanel.Position = UDim2.new(0.5, -150, 0.5, -125)
+warpPanel.Size = UDim2.new(0, 300, 0, 60 + #Config.Zones * 62)
+warpPanel.Position = UDim2.new(0.5, -150, 0.5, -(60 + #Config.Zones * 62) / 2)
 warpPanel.BackgroundColor3 = Color3.fromRGB(10, 50, 80)
 warpPanel.BackgroundTransparency = 0.08
 warpPanel.Visible = false

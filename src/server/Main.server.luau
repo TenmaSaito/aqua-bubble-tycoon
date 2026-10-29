@@ -89,6 +89,10 @@ task.spawn(function()
 		Lighting.Ambient = event.SkyColor
 		Lighting.OutdoorAmbient = event.SkyColor
 		announce(string.format("🌦 天候イベント「%s」発生! %s変異の泡が出るかも!", event.Name, event.MutationName))
+		-- 全ゾーンで花火のようなバースト（burstEffect は後方定義だが、初回発火は120秒後なので解決済み）
+		for _, zone in ipairs(Config.Zones) do
+			burstEffect(zone.Center + Vector3.new(0, 9, 0), event.Color, 42)
+		end
 		task.wait(Config.Weather.EventSeconds)
 		currentWeather = nil
 		workspace:SetAttribute("WeatherName", "")
