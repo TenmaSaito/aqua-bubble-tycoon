@@ -7,10 +7,11 @@
 local Config = {}
 
 Config.GameName = "Aqua Bubble Tycoon"
-Config.Version = "v3.3.1"
+Config.Version = "v3.3.2"
 
--- 泡を取ったときのポップ音（Roblox標準サウンド。差し替えたい場合はここに rbxassetid を入れる）
-Config.PopSoundId = "rbxasset://sounds/pop.wav"
+-- 泡を取ったときのポップ音。"" の場合はクライアントが実在する標準サウンドを自動で選ぶ。
+-- 自分でアップロードした音源を使いたい場合は、ここに rbxassetid://... を入れる
+Config.PopSoundId = ""
 
 -- バッジ（Creator Dashboard でバッジを作成し、IDを入れると自動で授与される。0は無効）
 Config.Badges = {

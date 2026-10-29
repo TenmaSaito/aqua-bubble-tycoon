@@ -221,9 +221,34 @@ coinsScale.Parent = coinsLabel
 -- 泡ポップ音（コンボが伸びるほど音程が上がる）
 local popSound = Instance.new("Sound")
 popSound.Name = "CollectPop"
-popSound.SoundId = Config.PopSoundId
-popSound.Volume = 0.45
+popSound.Volume = 0.55
 popSound.Parent = SoundService
+
+-- 音源の自動選択: 以前指定した rbxasset://sounds/pop.wav は現在のRobloxに存在せず無音だった。
+-- ContentProviderで実際に読み込めるか確認しながら、候補を順に試す
+task.spawn(function()
+	local ContentProvider = game:GetService("ContentProvider")
+	local candidates = {}
+	if Config.PopSoundId ~= "" then
+		table.insert(candidates, Config.PopSoundId)
+	end
+	for _, candidate in ipairs({
+		"rbxasset://sounds/splat.wav",
+		"rbxasset://sounds/snap.wav",
+		"rbxasset://sounds/electronicpingshort.wav",
+	}) do
+		table.insert(candidates, candidate)
+	end
+	for _, soundId in ipairs(candidates) do
+		popSound.SoundId = soundId
+		pcall(function()
+			ContentProvider:PreloadAsync({ popSound })
+		end)
+		if popSound.IsLoaded and popSound.TimeLength > 0 then
+			break
+		end
+	end
+end)
 
 local popupOrder = 0
 collectEffectRemote.OnClientEvent:Connect(function(reward: number, rarityId: string, isCrit: boolean, combo: number, mutationName: string, comboWindow: number)
