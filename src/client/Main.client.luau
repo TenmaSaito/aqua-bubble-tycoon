@@ -1,17 +1,22 @@
--- Main.client.luau
--- 画面UI（所持金表示・SHOPパネル・通知）をコードで生成する。
+-- Main.client.luau (v2)
+-- HUD・SHOP・演出（ポップアップ/告知バナー/コンボ/画面シェイク）をコードで生成する。
 -- 購入の確定はすべてサーバー側。ここは表示と「要求を送る」だけ。
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MarketplaceService = game:GetService("MarketplaceService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local remotes = ReplicatedStorage:WaitForChild("Remotes")
 local purchaseUpgradeRemote = remotes:WaitForChild("PurchaseUpgrade")
 local requestRebirthRemote = remotes:WaitForChild("RequestRebirth")
+local redeemCodeRemote = remotes:WaitForChild("RedeemCode")
 local notifyRemote = remotes:WaitForChild("Notify")
+local collectEffectRemote = remotes:WaitForChild("CollectEffect")
+local announcementRemote = remotes:WaitForChild("Announcement")
 
 local leaderstats = player:WaitForChild("leaderstats")
 local stats = player:WaitForChild("Stats")
@@ -20,6 +25,12 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "AquaHud"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
+
+local function addCorner(target: Instance, radius: number)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius)
+	corner.Parent = target
+end
 
 local function makeLabel(parent: Instance, size: UDim2, position: UDim2, text: string, textSize: number): TextLabel
 	local label = Instance.new("TextLabel")
@@ -32,16 +43,25 @@ local function makeLabel(parent: Instance, size: UDim2, position: UDim2, text: s
 	label.TextSize = textSize
 	label.Text = text
 	label.Parent = parent
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = label
+	addCorner(label, 8)
 	return label
 end
 
--- 上部バー
+local function findRarity(rarityId: string): any
+	for _, rarity in ipairs(Config.Rarities) do
+		if rarity.Id == rarityId then
+			return rarity
+		end
+	end
+	return Config.Rarities[1]
+end
+
+----------------------------------------------------------------
+-- 上部バーとステータス行
+----------------------------------------------------------------
 local coinsLabel = makeLabel(gui, UDim2.new(0, 210, 0, 40), UDim2.new(0, 12, 0, 10), "Coins: 0", 20)
 local bubblesLabel = makeLabel(gui, UDim2.new(0, 170, 0, 40), UDim2.new(0, 232, 0, 10), "Bubbles: 0", 20)
-local rebirthLabel = makeLabel(gui, UDim2.new(0, 170, 0, 40), UDim2.new(0, 412, 0, 10), "Rebirth: 0", 20)
+local rebirthLabel = makeLabel(gui, UDim2.new(0, 190, 0, 40), UDim2.new(0, 412, 0, 10), "Rebirth: 0", 20)
 
 local function refreshTopBar()
 	coinsLabel.Text = "Coins: " .. leaderstats.Coins.Value
@@ -53,8 +73,164 @@ leaderstats.Bubbles.Changed:Connect(refreshTopBar)
 leaderstats.Rebirths.Changed:Connect(refreshTopBar)
 refreshTopBar()
 
+-- 天候・全体ラック・フレーバー在庫などのライブステータス
+local statusLabel = makeLabel(gui, UDim2.new(0, 590, 0, 34), UDim2.new(0, 12, 0, 56), "", 15)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+task.spawn(function()
+	while true do
+		local parts = {}
+		local weatherName = workspace:GetAttribute("WeatherName")
+		if weatherName and weatherName ~= "" then
+			local remain = math.max(0, (workspace:GetAttribute("WeatherEndsAt") or 0) - os.time())
+			table.insert(parts, "🌦 " .. weatherName .. " あと" .. remain .. "秒")
+		end
+		local luckEnds = workspace:GetAttribute("ServerLuckEndsAt") or 0
+		if os.time() < luckEnds then
+			table.insert(parts, "🍀 全体ラック×2 あと" .. (luckEnds - os.time()) .. "秒")
+		end
+		local flavorName = workspace:GetAttribute("FlavorName")
+		if flavorName then
+			local remain = math.max(0, (workspace:GetAttribute("FlavorEndsAt") or 0) - os.time())
+			table.insert(parts, "🍬 在庫: " .. flavorName .. " あと" .. remain .. "秒")
+		end
+		local myFlavorEnds = player:GetAttribute("FlavorEndsAt") or 0
+		if os.time() < myFlavorEnds then
+			table.insert(parts, "✨ " .. (player:GetAttribute("FlavorName") or "") .. "バフ中 あと" .. (myFlavorEnds - os.time()) .. "秒")
+		end
+		if player:GetAttribute("FriendBoost") then
+			table.insert(parts, "👥 フレンド+10%")
+		end
+		statusLabel.Text = "  " .. table.concat(parts, "  |  ")
+		task.wait(0.5)
+	end
+end)
+
+----------------------------------------------------------------
+-- コンボメーター
+----------------------------------------------------------------
+local comboLabel = makeLabel(gui, UDim2.new(0, 300, 0, 38), UDim2.new(0.5, -150, 0, 100), "", 20)
+comboLabel.Visible = false
+local comboBarBack = Instance.new("Frame")
+comboBarBack.Size = UDim2.new(0, 300, 0, 10)
+comboBarBack.Position = UDim2.new(0.5, -150, 0, 140)
+comboBarBack.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+comboBarBack.BackgroundTransparency = 0.3
+comboBarBack.Visible = false
+comboBarBack.Parent = gui
+addCorner(comboBarBack, 5)
+local comboBar = Instance.new("Frame")
+comboBar.Size = UDim2.fromScale(1, 1)
+comboBar.BackgroundColor3 = Color3.fromRGB(255, 170, 40)
+comboBar.Parent = comboBarBack
+addCorner(comboBar, 5)
+
+local displayCombo = 0
+local lastCollectLocal = 0
+task.spawn(function()
+	while true do
+		local dt = task.wait()
+		if displayCombo > 0 then
+			local remain = Config.Combo.WindowSeconds - (os.clock() - lastCollectLocal)
+			if remain <= 0 then
+				displayCombo = 0
+				comboLabel.Visible = false
+				comboBarBack.Visible = false
+			else
+				comboLabel.Visible = true
+				comboBarBack.Visible = true
+				comboLabel.Text = string.format("🔥 %d COMBO (+%d%%)", displayCombo, math.floor(displayCombo * Config.Combo.PerCombo * 100))
+				comboBar.Size = UDim2.fromScale(remain / Config.Combo.WindowSeconds, 1)
+			end
+		end
+	end
+end)
+
+----------------------------------------------------------------
+-- 告知バナー（サーバー全体）
+----------------------------------------------------------------
+local banner = makeLabel(gui, UDim2.new(0, 720, 0, 52), UDim2.new(0.5, -360, 0, 160), "", 22)
+banner.BackgroundColor3 = Color3.fromRGB(140, 40, 180)
+banner.Visible = false
+local bannerQueue: { string } = {}
+local bannerBusy = false
+local function processBannerQueue()
+	if bannerBusy then
+		return
+	end
+	bannerBusy = true
+	while #bannerQueue > 0 do
+		local message = table.remove(bannerQueue, 1)
+		banner.Text = message
+		banner.Visible = true
+		task.wait(3.4)
+	end
+	banner.Visible = false
+	bannerBusy = false
+end
+announcementRemote.OnClientEvent:Connect(function(message: string)
+	table.insert(bannerQueue, message)
+	task.spawn(processBannerQueue)
+end)
+
+----------------------------------------------------------------
+-- 回収ポップアップ＋シェイク
+----------------------------------------------------------------
+local feed = Instance.new("Frame")
+feed.Size = UDim2.new(0, 320, 0, 300)
+feed.Position = UDim2.new(1, -332, 0, 120)
+feed.BackgroundTransparency = 1
+feed.Parent = gui
+local feedLayout = Instance.new("UIListLayout")
+feedLayout.FillDirection = Enum.FillDirection.Vertical
+feedLayout.SortOrder = Enum.SortOrder.LayoutOrder
+feedLayout.Padding = UDim.new(0, 4)
+feedLayout.Parent = feed
+
+local shakeTime = 0
+RunService.RenderStepped:Connect(function(dt)
+	if shakeTime > 0 then
+		shakeTime -= dt
+		local camera = workspace.CurrentCamera
+		if camera then
+			local offset = Vector3.new((math.random() - 0.5) * 0.7, (math.random() - 0.5) * 0.7, 0)
+			camera.CFrame = camera.CFrame * CFrame.new(offset)
+		end
+	end
+end)
+
+local popupOrder = 0
+collectEffectRemote.OnClientEvent:Connect(function(reward: number, rarityId: string, isCrit: boolean, combo: number, mutationName: string)
+	displayCombo = combo
+	lastCollectLocal = os.clock()
+	local rarity = findRarity(rarityId)
+	popupOrder += 1
+	local label = Instance.new("TextLabel")
+	label.LayoutOrder = popupOrder
+	label.Size = UDim2.new(1, 0, 0, 34)
+	label.BackgroundColor3 = rarity.Color
+	label.BackgroundTransparency = 0.25
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = isCrit and 24 or 18
+	label.Text = string.format("+%d  %s%s%s", reward, mutationName or "", rarity.Name, isCrit and "  💥CRITICAL!" or "")
+	label.Parent = feed
+	addCorner(label, 8)
+	if isCrit or rarityId == "Legendary" or rarityId == "Mythic" then
+		shakeTime = 0.35
+	end
+	task.delay(1.5, function()
+		local tween = TweenService:Create(label, TweenInfo.new(0.4), { TextTransparency = 1, BackgroundTransparency = 1 })
+		tween:Play()
+		tween.Completed:Wait()
+		label:Destroy()
+	end)
+end)
+
+----------------------------------------------------------------
 -- 通知トースト
-local toast = makeLabel(gui, UDim2.new(0, 520, 0, 44), UDim2.new(0.5, -260, 0, 62), "", 18)
+----------------------------------------------------------------
+local toast = makeLabel(gui, UDim2.new(0, 560, 0, 44), UDim2.new(0.5, -280, 0, 224), "", 18)
 toast.Visible = false
 local toastToken = 0
 notifyRemote.OnClientEvent:Connect(function(message: string)
@@ -68,7 +244,9 @@ notifyRemote.OnClientEvent:Connect(function(message: string)
 	end
 end)
 
--- SHOPボタン
+----------------------------------------------------------------
+-- SHOPパネル（スクロール）
+----------------------------------------------------------------
 local shopButton = Instance.new("TextButton")
 shopButton.Size = UDim2.new(0, 130, 0, 52)
 shopButton.Position = UDim2.new(1, -142, 0, 10)
@@ -78,38 +256,32 @@ shopButton.Font = Enum.Font.GothamBold
 shopButton.TextSize = 22
 shopButton.Text = "SHOP"
 shopButton.Parent = gui
-local shopCorner = Instance.new("UICorner")
-shopCorner.CornerRadius = UDim.new(0, 10)
-shopCorner.Parent = shopButton
+addCorner(shopButton, 10)
 
--- SHOPパネル
-local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 460, 0, 620)
-panel.Position = UDim2.new(0.5, -230, 0.5, -310)
+local panel = Instance.new("ScrollingFrame")
+panel.Size = UDim2.new(0, 470, 0, 560)
+panel.Position = UDim2.new(0.5, -235, 0.5, -280)
 panel.BackgroundColor3 = Color3.fromRGB(12, 45, 80)
 panel.BackgroundTransparency = 0.08
+panel.CanvasSize = UDim2.new(0, 0, 0, 1420)
+panel.ScrollBarThickness = 8
 panel.Visible = false
 panel.Parent = gui
-local panelCorner = Instance.new("UICorner")
-panelCorner.CornerRadius = UDim.new(0, 12)
-panelCorner.Parent = panel
+addCorner(panel, 12)
 
-local title = makeLabel(panel, UDim2.new(1, -20, 0, 40), UDim2.new(0, 10, 0, 8), "SHOP - アップグレード", 20)
+local title = makeLabel(panel, UDim2.new(1, -20, 0, 40), UDim2.new(0, 10, 0, 8), "SHOP - アップグレード / 図鑑", 20)
 title.BackgroundTransparency = 1
 
 shopButton.MouseButton1Click:Connect(function()
 	panel.Visible = not panel.Visible
 end)
 
--- アップグレード行を作る（レベルとコストは自動で追従する）
 local rowY = 56
 local function makeUpgradeRow(upgradeId: string)
 	local def = Config.Upgrades[upgradeId]
 	local levelValue = stats:WaitForChild(upgradeId .. "Level")
-
 	local row = makeLabel(panel, UDim2.new(1, -20, 0, 58), UDim2.new(0, 10, 0, rowY), "", 15)
 	row.TextXAlignment = Enum.TextXAlignment.Left
-
 	local buy = Instance.new("TextButton")
 	buy.Size = UDim2.new(0, 104, 0, 38)
 	buy.Position = UDim2.new(1, -114, 0.5, -19)
@@ -119,10 +291,7 @@ local function makeUpgradeRow(upgradeId: string)
 	buy.TextSize = 16
 	buy.Text = "買う"
 	buy.Parent = row
-	local buyCorner = Instance.new("UICorner")
-	buyCorner.CornerRadius = UDim.new(0, 8)
-	buyCorner.Parent = buy
-
+	addCorner(buy, 8)
 	local function refresh()
 		if levelValue.Value >= def.MaxLevel then
 			row.Text = string.format("  %s  Lv.MAX\n  %s", def.Name, def.Description)
@@ -136,7 +305,6 @@ local function makeUpgradeRow(upgradeId: string)
 	levelValue.Changed:Connect(refresh)
 	leaderstats.Coins.Changed:Connect(refresh)
 	refresh()
-
 	buy.MouseButton1Click:Connect(function()
 		purchaseUpgradeRemote:FireServer(upgradeId)
 	end)
@@ -146,6 +314,7 @@ end
 makeUpgradeRow("Value")
 makeUpgradeRow("Speed")
 makeUpgradeRow("Magnet")
+makeUpgradeRow("Luck")
 
 -- リバース行
 local rebirthRow = makeLabel(panel, UDim2.new(1, -20, 0, 58), UDim2.new(0, 10, 0, rowY), "", 15)
@@ -159,10 +328,7 @@ rebirthBuy.Font = Enum.Font.GothamBold
 rebirthBuy.TextSize = 16
 rebirthBuy.Text = "転生"
 rebirthBuy.Parent = rebirthRow
-local rebirthCorner = Instance.new("UICorner")
-rebirthCorner.CornerRadius = UDim.new(0, 8)
-rebirthCorner.Parent = rebirthBuy
-
+addCorner(rebirthBuy, 8)
 local function refreshRebirth()
 	local cost = Config.RebirthCost(leaderstats.Rebirths.Value)
 	rebirthRow.Text = string.format("  リバース（転生） 現在 %d 回\n  コインとレベルをリセットし、永久倍率+50%%", leaderstats.Rebirths.Value)
@@ -175,7 +341,7 @@ rebirthBuy.MouseButton1Click:Connect(function()
 end)
 rowY += 68
 
--- 課金行（ゲームパス / 開発者製品）。ID未設定の間は押せない表示にする
+-- 課金行
 local function makePurchaseRow(labelText: string, id: number, onClick: () -> ())
 	local row = makeLabel(panel, UDim2.new(1, -20, 0, 46), UDim2.new(0, 10, 0, rowY), "  " .. labelText, 15)
 	row.TextXAlignment = Enum.TextXAlignment.Left
@@ -188,9 +354,7 @@ local function makePurchaseRow(labelText: string, id: number, onClick: () -> ())
 	buy.TextSize = 14
 	buy.Text = id ~= 0 and "Robuxで買う" or "ID未設定"
 	buy.Parent = row
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = buy
+	addCorner(buy, 8)
 	if id ~= 0 then
 		buy.MouseButton1Click:Connect(onClick)
 	end
@@ -203,9 +367,88 @@ end)
 makePurchaseRow("ゲームパス: 磁石の範囲2倍", Config.GamePasses.AutoCollect, function()
 	MarketplaceService:PromptGamePassPurchase(player, Config.GamePasses.AutoCollect)
 end)
+makePurchaseRow("ゲームパス: レア率1.5倍", Config.GamePasses.Lucky, function()
+	MarketplaceService:PromptGamePassPurchase(player, Config.GamePasses.Lucky)
+end)
+makePurchaseRow("全体ラック×2 (15分・全員)", Config.Products.ServerLuck.Id, function()
+	MarketplaceService:PromptProductPurchase(player, Config.Products.ServerLuck.Id)
+end)
 makePurchaseRow("開発者製品: " .. Config.Products.CoinsSmall.Label, Config.Products.CoinsSmall.Id, function()
 	MarketplaceService:PromptProductPurchase(player, Config.Products.CoinsSmall.Id)
 end)
 makePurchaseRow("開発者製品: " .. Config.Products.CoinsLarge.Label, Config.Products.CoinsLarge.Id, function()
 	MarketplaceService:PromptProductPurchase(player, Config.Products.CoinsLarge.Id)
 end)
+
+-- コード入力行
+local codeRow = makeLabel(panel, UDim2.new(1, -20, 0, 46), UDim2.new(0, 10, 0, rowY), "  コード入力", 15)
+codeRow.TextXAlignment = Enum.TextXAlignment.Left
+local codeBox = Instance.new("TextBox")
+codeBox.Size = UDim2.new(0, 190, 0, 32)
+codeBox.Position = UDim2.new(0, 130, 0.5, -16)
+codeBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+codeBox.TextColor3 = Color3.fromRGB(20, 20, 20)
+codeBox.Font = Enum.Font.GothamBold
+codeBox.TextSize = 15
+codeBox.PlaceholderText = "コードを入力"
+codeBox.Text = ""
+codeBox.Parent = codeRow
+addCorner(codeBox, 8)
+local codeBuy = Instance.new("TextButton")
+codeBuy.Size = UDim2.new(0, 80, 0, 32)
+codeBuy.Position = UDim2.new(1, -90, 0.5, -16)
+codeBuy.BackgroundColor3 = Color3.fromRGB(0, 150, 220)
+codeBuy.TextColor3 = Color3.new(1, 1, 1)
+codeBuy.Font = Enum.Font.GothamBold
+codeBuy.TextSize = 14
+codeBuy.Text = "交換"
+codeBuy.Parent = codeRow
+addCorner(codeBuy, 8)
+codeBuy.MouseButton1Click:Connect(function()
+	if codeBox.Text ~= "" then
+		redeemCodeRemote:FireServer(codeBox.Text)
+		codeBox.Text = ""
+	end
+end)
+rowY += 54
+
+-- 図鑑（レアリティ一覧・確率は全表示）
+local indexTitle = makeLabel(panel, UDim2.new(1, -20, 0, 36), UDim2.new(0, 10, 0, rowY), "  📖 泡図鑑（確率は通常時のもの）", 16)
+indexTitle.TextXAlignment = Enum.TextXAlignment.Left
+indexTitle.BackgroundTransparency = 1
+rowY += 42
+for _, rarity in ipairs(Config.Rarities) do
+	local row = makeLabel(panel, UDim2.new(1, -20, 0, 34), UDim2.new(0, 10, 0, rowY), "", 14)
+	row.TextXAlignment = Enum.TextXAlignment.Left
+	local function refreshIndex()
+		local found = player:GetAttribute("Discovered_" .. rarity.Id)
+		local pct, oneIn = Config.RarityChanceText(rarity, 1)
+		row.Text = string.format("  %s %s  価値×%d  確率 %.2f%% (1 in %d)", found and "✓" or "？", rarity.Name, rarity.ValueMultiplier, pct, oneIn)
+		row.TextColor3 = found and rarity.Color or Color3.fromRGB(150, 150, 150)
+	end
+	player:GetAttributeChangedSignal("Discovered_" .. rarity.Id):Connect(refreshIndex)
+	refreshIndex()
+	rowY += 40
+end
+
+-- ミッション階段の進捗
+local missionRow = makeLabel(panel, UDim2.new(1, -20, 0, 58), UDim2.new(0, 10, 0, rowY), "", 14)
+missionRow.TextXAlignment = Enum.TextXAlignment.Left
+local function refreshMission()
+	local total = stats.TotalBubbles.Value
+	local nextTarget = nil
+	for _, threshold in ipairs(Config.Milestones) do
+		if total < threshold then
+			nextTarget = threshold
+			break
+		end
+	end
+	if nextTarget then
+		missionRow.Text = string.format("  🏆 累計の泡: %d 個\n  次の永久倍率まで あと %d 個（現在 +%d%%）", total, nextTarget - total, stats.MilestoneBoost.Value)
+	else
+		missionRow.Text = string.format("  🏆 累計の泡: %d 個\n  ミッション全達成! 永久倍率 +%d%%", total, stats.MilestoneBoost.Value)
+	end
+end
+stats.TotalBubbles.Changed:Connect(refreshMission)
+stats.MilestoneBoost.Changed:Connect(refreshMission)
+refreshMission()

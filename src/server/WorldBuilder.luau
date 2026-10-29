@@ -47,8 +47,8 @@ local function makeSign(parent: Instance, position: Vector3, text: string, color
 	guiBack.Parent = board
 end
 
--- ワールド全体を構築し、ポータルの Prompt 一覧を返す
-function WorldBuilder.Build(): (Folder, { ProximityPrompt })
+-- ワールド全体を構築し、ポータルの Prompt 一覧とフレーバーショップ情報を返す
+function WorldBuilder.Build(): (Folder, { ProximityPrompt }, ProximityPrompt, TextLabel)
 	local world = Instance.new("Folder")
 	world.Name = "GameWorld"
 	world.Parent = workspace
@@ -123,7 +123,52 @@ function WorldBuilder.Build(): (Folder, { ProximityPrompt })
 	-- ショップ案内看板（購入自体は画面右のSHOPボタンから）
 	makeSign(world, Vector3.new(22, 1, 20), "SHOPは画面のボタンから\nアップグレードとリバースができるよ", Color3.fromRGB(255, 140, 0))
 
-	return world, prompts
+	-- 中央の噴水（プレイヤーが集まる広場の目印。話題作の「集まる場所」設計）
+	local fountain = Instance.new("Folder")
+	fountain.Name = "Fountain"
+	fountain.Parent = world
+	local basin = makePart(fountain, "Basin", Vector3.new(14, 1.6, 14), Vector3.new(-20, 1.6, 20), Color3.fromRGB(200, 210, 220), Enum.Material.Marble)
+	basin.Shape = Enum.PartType.Cylinder
+	local waterBall = makePart(fountain, "Water", Vector3.new(6, 6, 6), Vector3.new(-20, 6, 20), Color3.fromRGB(90, 190, 255), Enum.Material.Glass)
+	waterBall.Shape = Enum.PartType.Ball
+	waterBall.Transparency = 0.3
+	waterBall.CanCollide = false
+	local fountainLight = Instance.new("PointLight")
+	fountainLight.Color = Color3.fromRGB(120, 210, 255)
+	fountainLight.Range = 30
+	fountainLight.Brightness = 1.5
+	fountainLight.Parent = waterBall
+
+	-- フレーバーショップ（5分ごとに在庫が回転する。看板の文字はサーバーが書き換える）
+	local flavorPad = makePart(world, "FlavorShopPad", Vector3.new(9, 0.6, 9), Vector3.new(-22, 1.3, 6), Color3.fromRGB(255, 110, 180), Enum.Material.Neon)
+	flavorPad.CanCollide = false
+	local flavorPrompt = Instance.new("ProximityPrompt")
+	flavorPrompt.Name = "FlavorPrompt"
+	flavorPrompt.ActionText = "買う"
+	flavorPrompt.ObjectText = "フレーバー"
+	flavorPrompt.HoldDuration = 0.4
+	flavorPrompt.MaxActivationDistance = 12
+	flavorPrompt.Parent = flavorPad
+
+	local flavorBoard = makePart(world, "FlavorBoard", Vector3.new(12, 4, 0.4), Vector3.new(-22, 8, -2), Color3.fromRGB(255, 110, 180), Enum.Material.SmoothPlastic)
+	flavorBoard.CanCollide = false
+	local flavorGui = Instance.new("SurfaceGui")
+	flavorGui.Face = Enum.NormalId.Front
+	flavorGui.Parent = flavorBoard
+	local stockLabel = Instance.new("TextLabel")
+	stockLabel.Name = "StockLabel"
+	stockLabel.Size = UDim2.fromScale(1, 1)
+	stockLabel.BackgroundTransparency = 1
+	stockLabel.Text = "フレーバーショップ"
+	stockLabel.TextScaled = true
+	stockLabel.Font = Enum.Font.GothamBold
+	stockLabel.TextColor3 = Color3.new(1, 1, 1)
+	stockLabel.Parent = flavorGui
+	local flavorGuiBack = flavorGui:Clone()
+	flavorGuiBack.Face = Enum.NormalId.Back
+	flavorGuiBack.Parent = flavorBoard
+
+	return world, prompts, flavorPrompt, stockLabel
 end
 
 return WorldBuilder
