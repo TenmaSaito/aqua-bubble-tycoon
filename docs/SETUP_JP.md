@@ -46,9 +46,10 @@ cloneしただけではまだゲームは動きません。**Roblox Studio に�
    - StarterPlayer > StarterPlayerScripts > Client > Main
 
 ### A-4. データ保存を有効にする
-1. Studio上部 **Home** タブ → **Game Settings**
-2. **Security** → **Enable Studio Access to API Services** を **ON**
-3. Save を押す
+1. Studio左上の **ファイル** → **ゲーム設定**（ホームタブにも「ゲーム設定」ボタンがある）
+2. 左メニューの **セキュリティ** → **「StudioのAPIサービスへのアクセスを有効化」** を **ON**
+3. **保存** を押す
+   - 初回は先に「基本情報」の入力と保存を求められることがある。その場合は画面の指示どおり保存してから戻る
 
 ### A-5. 再生して確認する
 1. **F5**（または Play ボタン）を押す
