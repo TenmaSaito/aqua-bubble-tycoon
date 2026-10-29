@@ -34,6 +34,10 @@
 
 ## Roblox Studioへの取り込み方
 
+> **初めての方は [docs/SETUP_JP.md](docs/SETUP_JP.md) の手順書を上から順にやってください。** この下は要約です。
+
+
+
 ### 方法A: Rojo（推奨・このリポジトリの前提）
 
 1. PCに [Roblox Studio](https://create.roblox.com/) をインストールし、自分のRobloxアカウントでログインする
