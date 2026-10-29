@@ -101,6 +101,10 @@ task.spawn(function()
 		if player:GetAttribute("FriendBoost") then
 			table.insert(parts, "👥 フレンド+10%")
 		end
+		local charmName = player:GetAttribute("ActiveCharmName")
+		if charmName and charmName ~= "" then
+			table.insert(parts, "🔮 " .. charmName)
+		end
 		statusLabel.Text = "  " .. table.concat(parts, "  |  ")
 		task.wait(0.5)
 	end
@@ -127,11 +131,12 @@ addCorner(comboBar, 5)
 
 local displayCombo = 0
 local lastCollectLocal = 0
+local serverComboWindow = Config.Combo.WindowSeconds
 task.spawn(function()
 	while true do
-		local dt = task.wait()
+		task.wait()
 		if displayCombo > 0 then
-			local remain = Config.Combo.WindowSeconds - (os.clock() - lastCollectLocal)
+			local remain = serverComboWindow - (os.clock() - lastCollectLocal)
 			if remain <= 0 then
 				displayCombo = 0
 				comboLabel.Visible = false
@@ -140,7 +145,7 @@ task.spawn(function()
 				comboLabel.Visible = true
 				comboBarBack.Visible = true
 				comboLabel.Text = string.format("🔥 %d COMBO (+%d%%)", displayCombo, math.floor(displayCombo * Config.Combo.PerCombo * 100))
-				comboBar.Size = UDim2.fromScale(remain / Config.Combo.WindowSeconds, 1)
+				comboBar.Size = UDim2.fromScale(remain / serverComboWindow, 1)
 			end
 		end
 	end
@@ -199,10 +204,20 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
+local coinsScale = Instance.new("UIScale")
+coinsScale.Parent = coinsLabel
+
 local popupOrder = 0
-collectEffectRemote.OnClientEvent:Connect(function(reward: number, rarityId: string, isCrit: boolean, combo: number, mutationName: string)
+collectEffectRemote.OnClientEvent:Connect(function(reward: number, rarityId: string, isCrit: boolean, combo: number, mutationName: string, comboWindow: number)
 	displayCombo = combo
 	lastCollectLocal = os.clock()
+	if comboWindow then
+		serverComboWindow = comboWindow
+	end
+	if reward >= 100 or isCrit then
+		coinsScale.Scale = 1.18
+		TweenService:Create(coinsScale, TweenInfo.new(0.25), { Scale = 1 }):Play()
+	end
 	local rarity = findRarity(rarityId)
 	popupOrder += 1
 	local label = Instance.new("TextLabel")
@@ -452,3 +467,198 @@ end
 stats.TotalBubbles.Changed:Connect(refreshMission)
 stats.MilestoneBoost.Changed:Connect(refreshMission)
 refreshMission()
+
+----------------------------------------------------------------
+-- v3: レガシーパネル / チャーム選択 / オートウォーク / パネルの閉じるボタン
+----------------------------------------------------------------
+local purchaseLegacyRemote = remotes:WaitForChild("PurchaseLegacy")
+local charmOfferRemote = remotes:WaitForChild("CharmOffer")
+local charmSelectRemote = remotes:WaitForChild("CharmSelect")
+
+local function makeSideButton(order: number, text: string, color: Color3): TextButton
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0, 130, 0, 44)
+	button.Position = UDim2.new(1, -142, 0, 70 + (order - 1) * 52)
+	button.BackgroundColor3 = color
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 17
+	button.Text = text
+	button.Parent = gui
+	addCorner(button, 10)
+	return button
+end
+
+-- SHOPパネルの閉じるボタン
+local shopClose = Instance.new("TextButton")
+shopClose.Size = UDim2.new(0, 36, 0, 36)
+shopClose.Position = UDim2.new(1, -44, 0, 8)
+shopClose.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+shopClose.TextColor3 = Color3.new(1, 1, 1)
+shopClose.Font = Enum.Font.GothamBold
+shopClose.TextSize = 18
+shopClose.Text = "✕"
+shopClose.Parent = panel
+addCorner(shopClose, 8)
+shopClose.MouseButton1Click:Connect(function()
+	panel.Visible = false
+end)
+
+-- レガシーパネル
+local legacyButton = makeSideButton(1, "🌳 LEGACY", Color3.fromRGB(140, 60, 220))
+local legacyPanel = Instance.new("ScrollingFrame")
+legacyPanel.Size = UDim2.new(0, 470, 0, 560)
+legacyPanel.Position = UDim2.new(0.5, -235, 0.5, -280)
+legacyPanel.BackgroundColor3 = Color3.fromRGB(45, 18, 80)
+legacyPanel.BackgroundTransparency = 0.08
+legacyPanel.CanvasSize = UDim2.new(0, 0, 0, 900)
+legacyPanel.ScrollBarThickness = 8
+legacyPanel.Visible = false
+legacyPanel.Parent = gui
+addCorner(legacyPanel, 12)
+legacyButton.MouseButton1Click:Connect(function()
+	legacyPanel.Visible = not legacyPanel.Visible
+	panel.Visible = false
+end)
+
+local legacyTitle = makeLabel(legacyPanel, UDim2.new(1, -20, 0, 40), UDim2.new(0, 10, 0, 8), "🌳 レガシーツリー", 20)
+legacyTitle.BackgroundTransparency = 1
+local legacyClose = Instance.new("TextButton")
+legacyClose.Size = UDim2.new(0, 36, 0, 36)
+legacyClose.Position = UDim2.new(1, -44, 0, 8)
+legacyClose.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+legacyClose.TextColor3 = Color3.new(1, 1, 1)
+legacyClose.Font = Enum.Font.GothamBold
+legacyClose.TextSize = 18
+legacyClose.Text = "✕"
+legacyClose.Parent = legacyPanel
+addCorner(legacyClose, 8)
+legacyClose.MouseButton1Click:Connect(function()
+	legacyPanel.Visible = false
+end)
+
+local legacyY = 56
+local function refreshLegacyTitle()
+	legacyTitle.Text = string.format("🌳 レガシーツリー（⭐ %d ポイント）", stats.LegacyPoints.Value)
+end
+stats.LegacyPoints.Changed:Connect(refreshLegacyTitle)
+refreshLegacyTitle()
+
+for _, node in ipairs(Config.LegacyNodes) do
+	local row = makeLabel(legacyPanel, UDim2.new(1, -20, 0, 58), UDim2.new(0, 10, 0, legacyY), "", 14)
+	row.TextXAlignment = Enum.TextXAlignment.Left
+	local buy = Instance.new("TextButton")
+	buy.Size = UDim2.new(0, 104, 0, 38)
+	buy.Position = UDim2.new(1, -114, 0.5, -19)
+	buy.TextColor3 = Color3.new(1, 1, 1)
+	buy.Font = Enum.Font.GothamBold
+	buy.TextSize = 15
+	buy.Parent = row
+	addCorner(buy, 8)
+	local function refreshNode()
+		local owned = player:GetAttribute("OwnedLegacy_" .. node.Id)
+		local prereqOk = node.Requires == "" or player:GetAttribute("OwnedLegacy_" .. node.Requires)
+		row.Text = string.format("  [%s] %s（⭐%d）\n  %s", node.Branch, node.Name, node.Cost, node.Description)
+		if owned then
+			buy.Text = "解放済み"
+			buy.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
+		elseif not prereqOk then
+			buy.Text = "前提が必要"
+			buy.BackgroundColor3 = Color3.fromRGB(120, 90, 60)
+		else
+			buy.Text = "解放する"
+			buy.BackgroundColor3 = Color3.fromRGB(150, 70, 230)
+		end
+	end
+	player:GetAttributeChangedSignal("OwnedLegacy_" .. node.Id):Connect(refreshNode)
+	if node.Requires ~= "" then
+		player:GetAttributeChangedSignal("OwnedLegacy_" .. node.Requires):Connect(refreshNode)
+	end
+	refreshNode()
+	buy.MouseButton1Click:Connect(function()
+		purchaseLegacyRemote:FireServer(node.Id)
+	end)
+	legacyY += 66
+end
+
+-- チャーム3択ポップアップ
+local charmPanel = Instance.new("Frame")
+charmPanel.Size = UDim2.new(0, 640, 0, 210)
+charmPanel.Position = UDim2.new(0.5, -320, 0.5, -60)
+charmPanel.BackgroundColor3 = Color3.fromRGB(30, 20, 70)
+charmPanel.BackgroundTransparency = 0.05
+charmPanel.Visible = false
+charmPanel.Parent = gui
+addCorner(charmPanel, 14)
+local charmTitle = makeLabel(charmPanel, UDim2.new(1, -20, 0, 40), UDim2.new(0, 10, 0, 8), "🔮 このランのチャームを選ぼう（転生まで有効）", 19)
+charmTitle.BackgroundTransparency = 1
+
+charmOfferRemote.OnClientEvent:Connect(function(offeredIds: { string })
+	for _, child in ipairs(charmPanel:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+	charmPanel.Visible = true
+	for i, charmId in ipairs(offeredIds) do
+		local charm = Config.FindCharm(charmId)
+		if charm then
+			local button = Instance.new("TextButton")
+			button.Size = UDim2.new(0, 196, 0, 130)
+			button.Position = UDim2.new(0, 12 + (i - 1) * 208, 0, 60)
+			button.BackgroundColor3 = Color3.fromRGB(90, 50, 180)
+			button.TextColor3 = Color3.new(1, 1, 1)
+			button.Font = Enum.Font.GothamBold
+			button.TextSize = 16
+			button.Text = "🔮 " .. charm.Name .. "\n\n" .. charm.Description
+			button.TextWrapped = true
+			button.Parent = charmPanel
+			addCorner(button, 12)
+			button.MouseButton1Click:Connect(function()
+				charmSelectRemote:FireServer(charmId)
+				charmPanel.Visible = false
+			end)
+		end
+	end
+end)
+
+-- オートウォーク（レガシー解放後のみ表示。一番近い泡へ歩く）
+local autoButton = makeSideButton(2, "🤖 AUTO: OFF", Color3.fromRGB(70, 70, 90))
+autoButton.Visible = player:GetAttribute("HasAutoWalk") == true
+player:GetAttributeChangedSignal("HasAutoWalk"):Connect(function()
+	autoButton.Visible = player:GetAttribute("HasAutoWalk") == true
+end)
+
+local autoWalkEnabled = false
+autoButton.MouseButton1Click:Connect(function()
+	autoWalkEnabled = not autoWalkEnabled
+	autoButton.Text = autoWalkEnabled and "🤖 AUTO: ON" or "🤖 AUTO: OFF"
+	autoButton.BackgroundColor3 = autoWalkEnabled and Color3.fromRGB(0, 170, 90) or Color3.fromRGB(70, 70, 90)
+end)
+
+task.spawn(function()
+	local gameWorld = workspace:WaitForChild("GameWorld")
+	local bubblesFolder = gameWorld:WaitForChild("Bubbles")
+	while true do
+		task.wait(0.6)
+		if autoWalkEnabled then
+			local character = player.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if root and humanoid then
+				local nearest, nearestDist = nil, math.huge
+				for _, bubble in ipairs(bubblesFolder:GetChildren()) do
+					if bubble:IsA("BasePart") then
+						local dist = (bubble.Position - root.Position).Magnitude
+						if dist < nearestDist then
+							nearest, nearestDist = bubble, dist
+						end
+					end
+				end
+				if nearest and nearestDist > 3 then
+					humanoid:MoveTo(nearest.Position)
+				end
+			end
+		end
+	end
+end)

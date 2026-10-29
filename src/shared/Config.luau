@@ -7,7 +7,7 @@
 local Config = {}
 
 Config.GameName = "Aqua Bubble Tycoon"
-Config.Version = "v2"
+Config.Version = "v3"
 Config.DataStoreName = "AquaBubbleTycoon_v1" -- v1のセーブを引き継ぐため名前は変えない
 Config.AutosaveSeconds = 120
 
@@ -183,6 +183,69 @@ function Config.MagnetRadius(magnetLevel: number, hasAutoCollect: boolean): numb
 	return radius
 end
 
+-- レガシーツリー（転生ポイントで買う永続アビリティ。ゾーンや図鑑はリセットしない）
+-- ブランチ: Momentum（加速）/ Automation（自動化）/ Variance（運命）
+Config.LegacyNodes = {
+	{ Id = "HeadStart", Branch = "加速", Name = "ヘッドスタート", Cost = 1, Requires = "", Description = "転生直後に500コイン持ってスタート" },
+	{ Id = "Keeper", Branch = "加速", Name = "キーパー", Cost = 2, Requires = "HeadStart", Description = "転生しても磁石レベルを保持する" },
+	{ Id = "GoldenSpawn", Branch = "加速", Name = "ゴールデンスポーン", Cost = 2, Requires = "HeadStart", Description = "各ランの最初の泡はレア以上が確定" },
+	{ Id = "MagnetAura", Branch = "自動化", Name = "マグネットオーラ", Cost = 1, Requires = "", Description = "磁石Lv0でも半径10で自動回収が働く" },
+	{ Id = "AutoWalk", Branch = "自動化", Name = "オートウォーク", Cost = 3, Requires = "MagnetAura", Description = "自動移動ボタンを解放。一番近い泡へ勝手に歩く" },
+	{ Id = "OfflinePlus", Branch = "自動化", Name = "オフラインプラス", Cost = 2, Requires = "MagnetAura", Description = "オフライン報酬の上限16時間＆レート2倍" },
+	{ Id = "WeatherMagnet", Branch = "運命", Name = "ウェザーマグネット", Cost = 1, Requires = "", Description = "変異した泡の報酬+30%" },
+	{ Id = "ComboKeeper", Branch = "運命", Name = "コンボキーパー", Cost = 1, Requires = "", Description = "コンボの持続時間が3秒→5秒に伸びる" },
+	{ Id = "LuckySoul", Branch = "運命", Name = "ラッキーソウル", Cost = 2, Requires = "ComboKeeper", Description = "レアリティ格上げ抽選+8%" },
+	{ Id = "MutantStart", Branch = "運命", Name = "ミュータントスタート", Cost = 3, Requires = "WeatherMagnet", Description = "天候がなくても泡が5%で変異する（×5〜×50）" },
+}
+
+function Config.FindLegacyNode(nodeId: string): any
+	for _, node in ipairs(Config.LegacyNodes) do
+		if node.Id == nodeId then
+			return node
+		end
+	end
+	return nil
+end
+
+-- ランチャーム（転生ごとに3択、そのラン中だけ効く）
+Config.Charms = {
+	{ Id = "Greed", Name = "グリード", Description = "獲得コイン +30%" },
+	{ Id = "Swift", Name = "スイフト", Description = "速度+6 / コンボ持続+2秒" },
+	{ Id = "Lucky", Name = "ラッキー", Description = "格上げ+12% / クリティカル+5%" },
+	{ Id = "Magnet", Name = "マグネット", Description = "磁石の範囲 +10" },
+	{ Id = "Mutant", Name = "ミュータント", Description = "変異泡の報酬 +50%" },
+	{ Id = "Rain", Name = "レインダンサー", Description = "回収時に15%で雨変異（×10）が付く" },
+}
+
+function Config.FindCharm(charmId: string): any
+	for _, charm in ipairs(Config.Charms) do
+		if charm.Id == charmId then
+			return charm
+		end
+	end
+	return nil
+end
+
+-- 称号（累計獲得コインで自動昇格。頭上に表示される）
+Config.Titles = {
+	{ Threshold = 0, Name = "見習いバブラー", Color = Color3.fromRGB(200, 200, 200) },
+	{ Threshold = 1000, Name = "泡あつめ職人", Color = Color3.fromRGB(120, 230, 160) },
+	{ Threshold = 10000, Name = "バブルマスター", Color = Color3.fromRGB(90, 170, 255) },
+	{ Threshold = 100000, Name = "泡の大富豪", Color = Color3.fromRGB(200, 120, 255) },
+	{ Threshold = 1000000, Name = "伝説の泡王", Color = Color3.fromRGB(255, 190, 40) },
+	{ Threshold = 10000000, Name = "神話の泡神", Color = Color3.fromRGB(255, 70, 90) },
+}
+
+function Config.TitleFor(totalEarned: number): any
+	local current = Config.Titles[1]
+	for _, title in ipairs(Config.Titles) do
+		if totalEarned >= title.Threshold then
+			current = title
+		end
+	end
+	return current
+end
+
 function Config.DefaultData()
 	return {
 		Coins = 0,
@@ -199,6 +262,11 @@ function Config.DefaultData()
 		UnlockedZones = { Beach = true },
 		RedeemedCodes = {},
 		DiscoveredRarities = {},
+		LegacyPoints = 0,
+		OwnedLegacy = {},
+		ActiveCharm = "",
+		WeekKey = "",
+		WeeklyEarned = 0,
 	}
 end
 
